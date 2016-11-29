@@ -1,7 +1,10 @@
-public class Message {
+import java.io.Serializable;
+
+public class Message implements Serializable {
     public int id;
     public int level;
     public RmiInterface sender;
+    private static final long serialVersionUID = 7526471155622776147L;
 
     public Message(int id, int level, RmiInterface sender) {
         this.id = id;

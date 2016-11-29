@@ -3,7 +3,7 @@ import java.rmi.server.UnicastRemoteObject;
 
 
 public interface RmiInterface extends Remote {
-    void method() throws RemoteException;
-    void receiveMessage(Message msg);
-    void receiveAck();
+    void receiveMessage(Message msg) throws RemoteException;
+    void receiveAck(RmiInterface sender) throws RemoteException;
+    int getId() throws RemoteException;
 }
