@@ -15,21 +15,34 @@ public class Main {
 
     public static void createProcess(){
         try {
-            LocateRegistry.createRegistry(1091);
+            LocateRegistry.createRegistry(1092);
         } catch (RemoteException e) {
             e.printStackTrace();
         }
 
         try {
-            RmiComponent p1 = new RmiComponent(1, "localhost", 1091, 2);
-            new Thread(p1).start();
+            RmiComponent p2 = new RmiComponent(2, "145.94.148.40", 1092, 2);
+            new Thread(p2).start();
 
+
+
+
+            try {
+                Thread.sleep(1000*5);                 //1000 milliseconds is one second.
+            } catch(InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+
+            RmiInterface p1 = (RmiInterface) Naming.lookup("rmi://145.94.164.234:1091/1");
+            p1.method();
 
         } catch (RemoteException e) {
             e.printStackTrace();
         } catch (AlreadyBoundException e) {
             e.printStackTrace();
         } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (NotBoundException e) {
             e.printStackTrace();
         }
     }
