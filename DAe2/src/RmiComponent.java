@@ -6,6 +6,7 @@ import java.util.*;
 
 public class RmiComponent extends UnicastRemoteObject implements RmiInterface {
 
+    // both
     public int id;
     public int n;
 
@@ -41,6 +42,9 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface {
         Naming.bind(urlName, this);
     }
 
+    /*
+        Create a thread for the candidate
+     */
     public void startCandidate() {
         System.out.println(id + " creating candidate thread");
         candidateThread = new Thread() {
@@ -63,8 +67,10 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface {
         candidateThread.start();
     }
 
+    /*
+        Create a thread for the ordinary
+     */
     private void createOrdinaryThreadIfMissing() {
-        //System.out.println(id + " checking if should create ordinary thread");
         if (ordinaryThread == null){
             System.out.println(id + " creating ordinary thread");
             ordinaryThread = new Thread() {
@@ -80,6 +86,10 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface {
         }
     }
 
+    /*
+        A loop that a candidate runs until he get's a decision if he's elected or not
+        Each round is 3 seconds
+     */
     public void candidateMethod() throws RemoteException, NotBoundException, MalformedURLException, InterruptedException {
         System.out.println(id + " running candidateMethod");
         List<RmiInterface> links = getAllNodes();
@@ -110,13 +120,13 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface {
                     links.removeAll(subLinks);
                 }
                 try {
-                    Thread.sleep(1000*1);                 //1000 milliseconds is one second.
+                    Thread.sleep(1000*3);                 //1000 milliseconds is one second.
                 } catch(InterruptedException ex) {
                     Thread.currentThread().interrupt();
                 }
             } else {
                 try {
-                    Thread.sleep(1000*1);                 //1000 milliseconds is one second.
+                    Thread.sleep(1000*3);                 //1000 milliseconds is one second.
                 } catch(InterruptedException ex) {
                     Thread.currentThread().interrupt();
                 }
@@ -130,17 +140,38 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface {
         }
     }
 
-    private List<RmiInterface> getAllNodes() throws RemoteException, NotBoundException, MalformedURLException {
+    /*
+        Collect all other components in a set
+     */
+    private List<RmiInterface> getAllNodes() {
         List<RmiInterface> links = new ArrayList<RmiInterface>();
+        String myIP = "145.94.166.120";
+        String rickyIP = "145.94.228.157";
+
         for(int i = 0; i < n; i++){
             if (i == id) continue;
             int port = 1090 + i;
-            RmiInterface p = (RmiInterface) Naming.lookup("rmi://localhost:" + port + "/" + i);
+            String ip = i < 4 ? myIP : rickyIP;
+            RmiInterface p = null;
+            try {
+                p = (RmiInterface) Naming.lookup("rmi://" + ip + ":" + port + "/" + i);
+            } catch (NotBoundException e) {
+                e.printStackTrace();
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
             links.add(p);
         }
+        System.out.println("created links size: " + links.size());
         return links;
     }
 
+    /*
+        A loop that an ordinary thread runs to send acknowledgements for the max message from each round
+        Each round is 3 seconds
+     */
     public void ordinaryMethod() throws RemoteException {
         System.out.println(id + " running ordinary method");
         while(true) {
@@ -148,13 +179,15 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface {
             if(link != null) link.receiveAck(this);
 
             try {
-                Thread.sleep(1000*1);                 //1000 milliseconds is one second.
+                Thread.sleep(1000*3);                 //1000 milliseconds is one second.
             } catch(InterruptedException ex) {
                 Thread.currentThread().interrupt();
             }
 
             ordinaryLevel++;
-            currentMaxMsg = new Message(currentMaxMsg.id, ordinaryLevel, currentMaxMsg.sender);
+            // make ordinary threads (who don't have a corresponding candidate thread) use an id of -1 as their original id value
+            int idToUse = candidateThread == null && currentMaxMsg.sender == null ? -1 : currentMaxMsg.id;
+            currentMaxMsg = new Message(idToUse, ordinaryLevel, currentMaxMsg.sender);
 
             if(!messages.isEmpty()) {
                 sortMessages();
@@ -174,7 +207,6 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface {
                 link = null;
             }
         }
-
     }
 
     @Override

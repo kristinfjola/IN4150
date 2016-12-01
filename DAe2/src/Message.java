@@ -1,5 +1,8 @@
 import java.io.Serializable;
 
+/**
+ * A class to contain the message sent from candidates to ordinary processes
+ */
 public class Message implements Serializable {
     public int id;
     public int level;

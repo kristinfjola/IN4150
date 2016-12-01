@@ -1,6 +1,4 @@
 import java.rmi.*;
-import java.rmi.server.UnicastRemoteObject;
-
 
 public interface RmiInterface extends Remote {
     void receiveMessage(Message msg) throws RemoteException;
