@@ -36,6 +36,8 @@ public class Main {
                 Thread.currentThread().interrupt();
             }
 
+
+
             // start the candidates
             p0.startCandidate();
             //p2.startCandidate();
