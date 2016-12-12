@@ -87,11 +87,11 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
                 if (!isFaulty || Math.random() > 0.3) {
                     p.receive(msg);
                 } else {
-                    System.out.println("FAULTY did not send message");
+                    System.out.println(id + " faulty did not send message");
                 }
             }
         } else {
-            System.out.println("FAULTY did not broadcast any messages");
+            System.out.println(id + " faulty did not broadcast any messages");
         }
     }
 
@@ -110,14 +110,19 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         return id;
     }
 
+    @Override
+    public void increaseNumberOfFaulty(int f) throws RemoteException {
+        this.f += f;
+    }
+
     private void waitForMessages(MessageType type, int round) {
-        System.out.println(id + " starting to wait");
+        System.out.println(id + " starting to wait for messages");
         int limit = n - f;
         int messageCount = countMessages(type, round);
         while(messageCount < limit) {
             messageCount = countMessages(type, round);
         }
-        System.out.println(id + " finishing wait");
+        System.out.println(id + " finishing waiting for messages");
     }
 
     /*
@@ -126,18 +131,15 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
      */
     private int countMessages(MessageType type, int round) {
         int count = 0;
-        //List<Message> oldMessages = new ArrayList<Message>();
         List<Message> currentMessages = new ArrayList<Message>(messages);
         for(Message m : currentMessages) {
-            //if(m.round < round) oldMessages.add(m);
             if (m == null) {
-                System.out.println("MESSAGE IS NULL");
+                System.out.println("Error, message is null, try again");
                 return count;
             }
             if(m.type == type && m.round == round) count++;
 
         }
-        //messages.removeAll(oldMessages);
         return count;
     }
 
@@ -160,7 +162,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
             int value = 0;
             if (isFaulty) {
                 value = Math.random() > chanceOfWrongValue ? value : (Math.random() < 0.5 ? 1 : 2);
-                System.out.println("FAULTY sending value " + value + " instead of 0");
+                System.out.println(id + " faulty sending value " + value + " instead of 0");
             }
             broadcast(new Message(MessageType.PROPOSAL, round, value));
             return 0;
@@ -168,7 +170,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
             int value = 1;
             if (isFaulty) {
                 value = Math.random() > chanceOfWrongValue ? value : (Math.random() < 0.5 ? 0 : 2);
-                System.out.println("FAULTY sending value " + value + " instead of 1");
+                System.out.println(id + " faulty sending value " + value + " instead of 1");
             }
             broadcast(new Message(MessageType.PROPOSAL, round, value));
             return 1;
@@ -176,7 +178,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
             int value = 2;
             if (isFaulty) {
                 value = Math.random() > chanceOfWrongValue ? value : (Math.random() < 0.5 ? 0 : 1);
-                System.out.println("FAULTY sending value " + value + " instead of 2");
+                System.out.println(id + " faulty sending value " + value + " instead of 2");
             }
             broadcast(new Message(MessageType.PROPOSAL, round, value));
             return 2;
@@ -220,7 +222,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
     }
 
     public void randomDelay() {
-        if (false) return;
+        if (false) return;  // control whether to use delays in general
 
         double rand = Math.random();
         if(rand < 0.3) {
@@ -228,7 +230,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
             long delay = (long) (1000*rand);
             System.out.println("Doing delay of " + delay);
             try {
-                Thread.sleep(delay);                 //1000 milliseconds is one second.
+                Thread.sleep(delay);
             } catch(InterruptedException ex) {
                 Thread.currentThread().interrupt();
             }
