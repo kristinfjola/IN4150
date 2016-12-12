@@ -2,6 +2,7 @@ import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -16,13 +17,15 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
     public int f;
     public boolean decided;
     public final Lock lock = new ReentrantLock();
+    public boolean isFaulty;
 
-    protected RmiComponent(int id, String host, int port, int n, int f, int value) throws RemoteException, AlreadyBoundException, MalformedURLException {
+    protected RmiComponent(int id, String host, int port, int n, boolean isFaulty, int value, int f) throws RemoteException, AlreadyBoundException, MalformedURLException {
         this.id = id;
         this.n = n;
-        this.f = f;
+        this.isFaulty = isFaulty;
         this.value = value;
         this.decided = false;
+        this.f = f;
 
         // bind
         String urlName = "rmi://" + host + ":" + port + "/" + id;
@@ -38,8 +41,10 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         int round = 1;
         while(true) {
             System.out.println(id + " round: " + round);
+
             // notification phase
             try {
+                randomDelay();
                 broadcast(new Message(MessageType.NOTIFICATION, round, value));
             } catch (RemoteException e) {
                 e.printStackTrace();
@@ -49,6 +54,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
             // proposal phase
             int proposedVal = 0;
             try {
+                randomDelay();
                 proposedVal = proposeValue(round);
             } catch (RemoteException e) {
                 e.printStackTrace();
@@ -62,6 +68,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
             }
 
             // decision phase
+            randomDelay();
             decideValue(round);
             round++;
         }
@@ -69,41 +76,32 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
 
     @Override
     public void addNeighbours(List<RmiInterface> processes) throws RemoteException {
-        /*for(RmiInterface p : processes) {
-            if(p.getId() != id) {
-                neighbours.add(p);
-            }
-        }*/
         neighbours.addAll(processes);
     }
 
     @Override
     public void broadcast(Message msg) throws RemoteException {
         System.out.println(id + " broadcasting " +  msg.type.toString() + " value: " + value);
-        for(RmiInterface p : neighbours) {
-            p.receive(msg);
+        if (!isFaulty || Math.random() > 0.2) {
+            for(RmiInterface p : neighbours) {
+                if (!isFaulty || Math.random() > 0.3) {
+                    p.receive(msg);
+                } else {
+                    System.out.println("FAULTY did not send message");
+                }
+            }
+        } else {
+            System.out.println("FAULTY did not broadcast any messages");
         }
     }
 
     @Override
     public void receive(Message msg) throws RemoteException {
-        //System.out.println(id + " receiving message type " + msg.type.toString());
-        try {
-            Thread.sleep(10);                 //1000 milliseconds is one second.
-        } catch(InterruptedException ex) {
-            Thread.currentThread().interrupt();
-        }
         lock.lock();
         try {
             messages.add(msg);
         } finally {
             lock.unlock();
-        }
-        //System.out.println(id + " messages size");
-        try {
-            Thread.sleep(10);                 //1000 milliseconds is one second.
-        } catch(InterruptedException ex) {
-            Thread.currentThread().interrupt();
         }
     }
 
@@ -134,6 +132,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
             //if(m.round < round) oldMessages.add(m);
             if (m == null) {
                 System.out.println("MESSAGE IS NULL");
+                return count;
             }
             if(m.type == type && m.round == round) count++;
 
@@ -156,14 +155,30 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         System.out.println(id + " counted notifications: zeros " + zeros + " ones " + ones);
 
         int limit = (n+f)/2;
+        double chanceOfWrongValue = 1;
         if(zeros > limit) {
-            broadcast(new Message(MessageType.PROPOSAL, round, 0));
+            int value = 0;
+            if (isFaulty) {
+                value = Math.random() > chanceOfWrongValue ? value : (Math.random() < 0.5 ? 1 : 2);
+                System.out.println("FAULTY sending value " + value + " instead of 0");
+            }
+            broadcast(new Message(MessageType.PROPOSAL, round, value));
             return 0;
         } else if (ones > limit) {
-            broadcast(new Message(MessageType.PROPOSAL, round, 1));
+            int value = 1;
+            if (isFaulty) {
+                value = Math.random() > chanceOfWrongValue ? value : (Math.random() < 0.5 ? 0 : 2);
+                System.out.println("FAULTY sending value " + value + " instead of 1");
+            }
+            broadcast(new Message(MessageType.PROPOSAL, round, value));
             return 1;
         } else {
-            broadcast(new Message(MessageType.PROPOSAL, round, 2));
+            int value = 2;
+            if (isFaulty) {
+                value = Math.random() > chanceOfWrongValue ? value : (Math.random() < 0.5 ? 0 : 1);
+                System.out.println("FAULTY sending value " + value + " instead of 2");
+            }
+            broadcast(new Message(MessageType.PROPOSAL, round, value));
             return 2;
         }
     }
@@ -201,6 +216,22 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         } else {
             this.value = Math.random() < 0.5 ? 0 : 1;
             System.out.println(id + " set random value of: " + this.value);
+        }
+    }
+
+    public void randomDelay() {
+        if (false) return;
+
+        double rand = Math.random();
+        if(rand < 0.3) {
+            rand = Math.random();
+            long delay = (long) (1000*rand);
+            System.out.println("Doing delay of " + delay);
+            try {
+                Thread.sleep(delay);                 //1000 milliseconds is one second.
+            } catch(InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 }
