@@ -10,11 +10,11 @@ import java.util.List;
 public class Main {
 
     public static void main(String[] args) {
-        int total = 50;
+        int total = 100;
         int local = total / 2;
         int faulty = 0;
         int port = 1090;
-        String myIP = "145.94.167.67";
+        String myIP = "145.94.164.89";
         System.setProperty("java.rmi.server.hostname", myIP);
         List<RmiInterface> processes = new ArrayList<RmiInterface>();
 

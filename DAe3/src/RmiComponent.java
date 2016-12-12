@@ -3,6 +3,8 @@ import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class RmiComponent extends UnicastRemoteObject implements RmiInterface, Runnable {
 
@@ -13,6 +15,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
     public int n;
     public int f;
     public boolean decided;
+    public final Lock lock = new ReentrantLock();
 
     protected RmiComponent(int id, String host, int port, int n, int f, int value) throws RemoteException, AlreadyBoundException, MalformedURLException {
         this.id = id;
@@ -25,7 +28,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         String urlName = "rmi://" + host + ":" + port + "/" + id;
         Naming.bind(urlName, this);
 
-        System.out.println(id + "created component with value: " + value);
+        System.out.println(id + " created component with value: " + value);
     }
 
     @Override
@@ -38,7 +41,6 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
             // notification phase
             try {
                 broadcast(new Message(MessageType.NOTIFICATION, round, value));
-                System.out.println(id + " broadcasting Notification, value: " + value);
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
@@ -77,6 +79,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
 
     @Override
     public void broadcast(Message msg) throws RemoteException {
+        System.out.println(id + " broadcasting " +  msg.type.toString() + " value: " + value);
         for(RmiInterface p : neighbours) {
             p.receive(msg);
         }
@@ -84,9 +87,24 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
 
     @Override
     public void receive(Message msg) throws RemoteException {
-        //System.out.println(id + " receiving message");
-        messages.add(msg);
+        //System.out.println(id + " receiving message type " + msg.type.toString());
+        try {
+            Thread.sleep(10);                 //1000 milliseconds is one second.
+        } catch(InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+        lock.lock();
+        try {
+            messages.add(msg);
+        } finally {
+            lock.unlock();
+        }
         //System.out.println(id + " messages size");
+        try {
+            Thread.sleep(10);                 //1000 milliseconds is one second.
+        } catch(InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Override
@@ -127,7 +145,8 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
     private int proposeValue(int round) throws RemoteException {
         int zeros = 0;
         int ones = 0;
-        for(Message m : messages) {
+        List<Message> currentMessages = new ArrayList<Message>(messages);
+        for(Message m : currentMessages) {
             if (m.type == MessageType.NOTIFICATION && m.round == round) {
                 if(m.value == 0) zeros ++;
                 else if (m.value == 1) ones++;
@@ -152,7 +171,8 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
     private void decideValue(int round) {
         int zeros = 0;
         int ones = 0;
-        for(Message m : messages) {
+        List<Message> currentMessages = new ArrayList<Message>(messages);
+        for(Message m : currentMessages) {
             if (m.type == MessageType.PROPOSAL && m.round == round) {
                 if(m.value == 0) zeros ++;
                 else if (m.value == 1) ones++;
