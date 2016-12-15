@@ -2,11 +2,13 @@ import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * The component for a process. Runs a loop with the algorithm until they decide on a value.
+ */
 public class RmiComponent extends UnicastRemoteObject implements RmiInterface, Runnable {
 
     public int id;
@@ -34,6 +36,9 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         System.out.println(id + " created component with value: " + value);
     }
 
+    /**
+     * Loop with the algorithm than runs until a process decides on a valu
+     */
     @Override
     public void run() {
         System.out.println(id + " running");
@@ -74,16 +79,24 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         }
     }
 
+    /*
+        Adding it's neighbours
+     */
     @Override
     public void addNeighbours(List<RmiInterface> processes) throws RemoteException {
         neighbours.addAll(processes);
     }
 
+    /*
+        Broadcasts a message to everybody. Faulty processes sometimes don't send messages.
+     */
     @Override
     public void broadcast(Message msg) throws RemoteException {
         System.out.println(id + " broadcasting " +  msg.type.toString() + " value: " + value);
+        // faulty processes sometimes don't send any messages
         if (!isFaulty || Math.random() > 0.2) {
             for(RmiInterface p : neighbours) {
+                // faulty processes can decide to not send a single message
                 if (!isFaulty || Math.random() > 0.3) {
                     p.receive(msg);
                 } else {
@@ -95,8 +108,12 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         }
     }
 
+    /*
+        Receiving a message and adding it to its list.
+     */
     @Override
     public void receive(Message msg) throws RemoteException {
+        // lock to handle concurrency errors
         lock.lock();
         try {
             messages.add(msg);
@@ -105,19 +122,20 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         }
     }
 
-    @Override
-    public int getId() throws RemoteException {
-        return id;
-    }
-
+    /*
+        Set the number of total faulty processes.
+     */
     @Override
     public void increaseNumberOfFaulty(int f) throws RemoteException {
         this.f += f;
     }
 
+    /*
+        Waiting for messages until they reach a certain number of messages for a type (Notification/Proposal) and round
+     */
     private void waitForMessages(MessageType type, int round) {
-        System.out.println(id + " starting to wait for messages");
         int limit = n - f;
+        System.out.println(id + " starting to wait for " + limit + " messages");
         int messageCount = countMessages(type, round);
         while(messageCount < limit) {
             messageCount = countMessages(type, round);
@@ -126,8 +144,7 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
     }
 
     /*
-        Counts messages of a specific types for the current round
-        and deletes messages from older rounds
+        Counting messages for one type and specific round.
      */
     private int countMessages(MessageType type, int round) {
         int count = 0;
@@ -143,21 +160,26 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         return count;
     }
 
+    /*
+        Deciding on which value to propose based on the number of ones and zeroes that were notified in the last round.
+     */
     private int proposeValue(int round) throws RemoteException {
         int zeros = 0;
         int ones = 0;
+        int twos = 0;
         List<Message> currentMessages = new ArrayList<Message>(messages);
         for(Message m : currentMessages) {
             if (m.type == MessageType.NOTIFICATION && m.round == round) {
                 if(m.value == 0) zeros ++;
                 else if (m.value == 1) ones++;
+                else if (m.value == 2) twos++;
             }
         }
 
-        System.out.println(id + " counted notifications: zeros " + zeros + " ones " + ones);
+        System.out.println(id + " round " + round + " counted notifications: zeros " + zeros + " ones " + ones + " twos " + twos);
 
         int limit = (n+f)/2;
-        double chanceOfWrongValue = 1;
+        double chanceOfWrongValue = 0.2;
         if(zeros > limit) {
             int value = 0;
             if (isFaulty) {
@@ -185,6 +207,9 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         }
     }
 
+    /*
+        Deciding on a value based on the number of ones and zeroes that were proposed in the last round.
+     */
     private void decideValue(int round) {
         int zeros = 0;
         int ones = 0;
@@ -221,6 +246,9 @@ public class RmiComponent extends UnicastRemoteObject implements RmiInterface, R
         }
     }
 
+    /*
+        Adding a random delay from 0-1 seconds.
+     */
     public void randomDelay() {
         if (false) return;  // control whether to use delays in general
 
